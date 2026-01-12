@@ -25,7 +25,7 @@ import java.util.concurrent.*;
 
 public class NodeMain {
     private static final java.util.Map<Integer, java.util.List<family.NodeInfo>> messageLocationMap = new java.util.concurrent.ConcurrentHashMap<>();
-    private static final DiskManager diskManager = new DiskManager();
+    private static DiskManager diskManager;
     private static final int START_PORT = 5555;
     private static final int PRINT_INTERVAL_SECONDS = 10;
     private static int TOLERANCE = 1;
@@ -37,6 +37,7 @@ public class NodeMain {
         String host = "127.0.0.1";
         int port = findFreePort(START_PORT);
 
+        diskManager = new DiskManager(port);
         NodeInfo self = NodeInfo.newBuilder()
                 .setHost(host)
                 .setPort(port)
@@ -112,28 +113,29 @@ public class NodeMain {
                 Command cmd = CommandParser.parse(text);
 
                 if (cmd instanceof SetCommand sc) {
-
+                    // 1. Önce lider kendi diskine yazsın
                     boolean localSuccess = diskManager.saveMessage(sc.id(), sc.message());
 
                     if (localSuccess) {
                         java.util.List<family.NodeInfo> savedNodes = new java.util.ArrayList<>();
-                        savedNodes.add(self);
+                        savedNodes.add(self); // Lideri ekle
 
-                        java.util.List<family.NodeInfo> members = registry.snapshot();
-                        java.util.List<family.NodeInfo> others = members.stream()
-                                .filter(n -> !(n.getHost().equals(self.getHost()) && n.getPort() == self.getPort()))
+                        // 2. Diğer üyeleri al (Lider hariç)
+                        java.util.List<family.NodeInfo> others = registry.snapshot().stream()
+                                .filter(n -> n.getPort() != self.getPort())
                                 .collect(java.util.stream.Collectors.toList());
-
-
 
                         int distributedCount = 0;
                         if (!others.isEmpty()) {
-                            int startIndex = sc.id() % others.size();
+                            // Round-robin başlangıç noktası
+                            int startIndex = Math.abs(sc.id()) % others.size();
 
                             for (int i = 0; i < others.size() && distributedCount < TOLERANCE; i++) {
                                 int targetIndex = (startIndex + i) % others.size();
                                 family.NodeInfo target = others.get(targetIndex);
 
+                                // KRİTİK: Diğer üyeye gRPC ile mesajı gönder
+                                System.out.println("📤 Yedekleniyor -> Port: " + target.getPort());
                                 if (sendStoreRequest(target, sc)) {
                                     savedNodes.add(target);
                                     distributedCount++;
@@ -141,17 +143,16 @@ public class NodeMain {
                             }
                         }
 
-
+                        // 3. Hafızayı (Map) mutlaka güncelle
                         messageLocationMap.put(sc.id(), savedNodes);
 
-                        if (distributedCount >= TOLERANCE || (others.size() < TOLERANCE && distributedCount == others.size())) {
+                        // 4. Doğrulama Logu
+                        if (distributedCount > 0) {
                             writer.println("OK");
-                            System.out.println("✅ ID=" + sc.id() + " başarıyla " + savedNodes.size() + " node'a dağıtıldı.");
+                            System.out.println("✅ ID=" + sc.id() + " kopyalandı. Lider + " + distributedCount + " yedek.");
                         } else {
-                            writer.println("ERROR: Yeterli kopyalama yapılamadı.");
+                            writer.println("ERROR: Yedekleme yapılamadı!");
                         }
-                    } else {
-                        writer.println("ERROR: Lider diske yazamadı.");
                     }
                 }
                 else if (cmd instanceof GetCommand gc) {
@@ -159,29 +160,36 @@ public class NodeMain {
                     String content = diskManager.loadMessage(gc.id());
 
                     if (content != null) {
+                        // Kendi diskinde bulduysa direkt yazdır
                         writer.println(content);
                     } else {
-                        // 2. Kendi diskinde yoksa, haritadan kimde olduğuna bak
-                        java.util.List<family.NodeInfo> owners = messageLocationMap.getOrDefault(gc.id(), java.util.Collections.emptyList());
+                        // 2. Kendi diskinde yoksa YEDEKLERE GİT
+                        System.out.println("⚠️ Lider diskinde " + gc.id() + " yok, yedekler taranıyor...");
 
-                        String foundContent = null;
+                        // Önce hafızadaki sahiplere bak, yoksa tüm aileyi tara
+                        java.util.List<family.NodeInfo> owners = messageLocationMap.getOrDefault(gc.id(), registry.snapshot());
+
+                        String remoteContent = null;
                         for (family.NodeInfo owner : owners) {
+                            // Kendini atla
                             if (owner.getPort() == self.getPort()) continue;
 
                             System.out.println("🔍 Mesaj " + owner.getPort() + " portundan isteniyor...");
-                            foundContent = fetchFromMember(owner, gc.id());
+                            String result = fetchFromMember(owner, gc.id());
 
-                            // Eğer üye crash olmuşsa veya ulaşılmazsa foundContent null döner
-                            if (foundContent != null && !foundContent.equals("NOT_FOUND")) {
-                                System.out.println("✅ Mesaj yedek üyeden başarıyla alındı.");
-                                break;
+                            // "NOT_FOUND" gelirse veya null gelirse diğerine geç
+                            if (result != null && !result.equals("NOT_FOUND") && !result.isEmpty()) {
+                                remoteContent = result;
+                                System.out.println("✅ Mesaj " + owner.getPort() + " portundan BAŞARIYLA ALINDI.");
+                                break; // BULUNDU! Döngüden çık
                             } else {
-                                System.out.println("⚠️ Üye cevap vermedi veya mesajı bulamadı, sıradaki yedeğe geçiliyor...");
+                                System.out.println("❌ " + owner.getPort() + " nolu üyede veri bulunamadı.");
                             }
                         }
 
-                        if (foundContent != null) {
-                            writer.println(foundContent);
+                        // 3. İstemciye nihai sonucu gönder
+                        if (remoteContent != null) {
+                            writer.println(remoteContent);
                         } else {
                             writer.println("NOT_FOUND");
                         }
@@ -386,14 +394,28 @@ public class NodeMain {
             }
         }
     private static String fetchFromMember(family.NodeInfo target, int id) {
-        io.grpc.ManagedChannel channel = io.grpc.ManagedChannelBuilder.forAddress(target.getHost(), target.getPort()).usePlaintext().build();
+        io.grpc.ManagedChannel channel = io.grpc.ManagedChannelBuilder
+                .forAddress(target.getHost(), target.getPort())
+                .usePlaintext()
+                .build();
         try {
             family.StorageServiceGrpc.StorageServiceBlockingStub stub = family.StorageServiceGrpc.newBlockingStub(channel);
             family.MessageId request = family.MessageId.newBuilder().setId(id).build();
-            family.StoredMessage response = stub.retrieve(request);
-            return response.getText();
-        } catch (Exception e) { return null; }
-        finally { channel.shutdownNow(); }
+
+            // Timeout süresini 5 saniye yapalım
+            family.StoredMessage response = stub.withDeadlineAfter(5, java.util.concurrent.TimeUnit.SECONDS).retrieve(request);
+
+            // GELEN VERİYİ KONTROL ET
+            if (response != null && response.getText() != null && !response.getText().isEmpty() && !response.getText().equals("NOT_FOUND")) {
+                return response.getText();
+            }
+            return null;
+        } catch (Exception e) {
+            System.err.println("❌ " + target.getPort() + " hatası: " + e.getMessage());
+            return null;
+        } finally {
+            channel.shutdownNow();
+        }
     }
     private static synchronized void checkLeadership(NodeRegistry registry, NodeInfo self) {
         List<NodeInfo> members = registry.snapshot();

@@ -4,37 +4,35 @@ import java.io.*;
 
 public class DiskManager {
     private static final String STORAGE_DIR = "messages";
+    private final int myPort; // Hangi portun diski olduğunu tutar
 
-    public DiskManager() {
-        // Klasör yoksa oluştur
+    public DiskManager(int port) {
+        this.myPort = port;
         File directory = new File(STORAGE_DIR);
         if (!directory.exists()) {
             directory.mkdir();
         }
     }
 
-    // Mesajı diske kaydet (SET)
     public boolean saveMessage(int id, String message) {
         try {
-            File file = new File(STORAGE_DIR, id + ".msg");
-            // Append false -> üzerine yazar (update)
+            // Dosya ismi artık ID_PORT.msg (Örn: 123_5555.msg)
+            File file = new File(STORAGE_DIR, id + "_" + myPort + ".msg");
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, false))) {
                 writer.write(message);
             }
             return true;
         } catch (IOException e) {
-            System.err.println("Disk yazma hatası: " + e.getMessage());
             return false;
         }
     }
 
-    // Mesajı diskten oku (GET)
     public String loadMessage(int id) {
-        File file = new File(STORAGE_DIR, id + ".msg");
+        // Okurken de kendi portuna ait dosyaya bakar
+        File file = new File(STORAGE_DIR, id + "_" + myPort + ".msg");
         if (!file.exists()) {
-            return null; // Dosya yoksa null dön
+            return null;
         }
-
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             StringBuilder content = new StringBuilder();
             String line;
@@ -43,7 +41,6 @@ public class DiskManager {
             }
             return content.toString();
         } catch (IOException e) {
-            System.err.println("Disk okuma hatası: " + e.getMessage());
             return null;
         }
     }

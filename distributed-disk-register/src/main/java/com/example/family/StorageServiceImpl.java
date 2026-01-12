@@ -32,20 +32,20 @@ public class StorageServiceImpl extends StorageServiceGrpc.StorageServiceImplBas
     }
 
     @Override
-    public void retrieve(MessageId request, StreamObserver<StoredMessage> responseObserver) {
-        int id = request.getId();
+    public void retrieve(family.MessageId request, io.grpc.stub.StreamObserver<family.StoredMessage> responseObserver) {
+        // DiskManager kullanarak dosyayı yükle
+        String content = diskManager.loadMessage(request.getId());
 
-
-        String content = diskManager.loadMessage(id);
-
-        StoredMessage.Builder builder = StoredMessage.newBuilder().setId(id);
-        if (content != null) {
-            builder.setText(content);
-        } else {
-            builder.setText("NOT_FOUND");
+        if (content == null) {
+            content = "NOT_FOUND"; // Boş dönmek yerine belirteç dön
         }
 
-        responseObserver.onNext(builder.build());
+        family.StoredMessage response = family.StoredMessage.newBuilder()
+                .setId(request.getId())
+                .setText(content)
+                .build();
+
+        responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 }
