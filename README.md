@@ -42,3 +42,6 @@ Sistem geliştirme süreci, modüler bir yaklaşımla aşağıdaki teknik aşama
 GRUP ÜYELERİ
 •23060490 - Rukiye Sıla Aslan
 •23060816 - Hayrunnisa Köle
+
+YouTube Sunum Videosu:
+https://youtu.be/nsl3TVXBi_4
