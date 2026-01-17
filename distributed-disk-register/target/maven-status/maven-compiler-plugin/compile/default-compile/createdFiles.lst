@@ -1,3 +1,4 @@
+com/example/family/HaToKuSeClient$Connection.class
 family/StorageServiceGrpc$StorageServiceBlockingStub.class
 family/FamilyProto.class
 family/NodeInfo$1.class
@@ -20,9 +21,11 @@ family/StoreResult.class
 family/StoredMessage.class
 family/FamilyServiceGrpc$AsyncService.class
 family/StoreResultOrBuilder.class
+com/example/family/HaToKuSeClient$Config.class
 family/FamilyServiceGrpc.class
 com/example/family/GetCommand.class
 family/StoredMessageOrBuilder.class
+com/example/family/HaToKuSeClient.class
 family/FamilyServiceGrpc$MethodHandlers.class
 family/MessageId$Builder.class
 family/MessageId$1.class

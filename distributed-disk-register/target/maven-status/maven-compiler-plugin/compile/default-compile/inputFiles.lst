@@ -3,6 +3,7 @@
 /home/silaaslan/proje/distributed-disk-register/distributed-disk-register/distributed-disk-register/src/main/java/com/example/family/NodeMain.java
 /home/silaaslan/proje/distributed-disk-register/distributed-disk-register/distributed-disk-register/target/generated-sources/protobuf/java/family/Empty.java
 /home/silaaslan/proje/distributed-disk-register/distributed-disk-register/distributed-disk-register/target/generated-sources/protobuf/java/family/StoreResultOrBuilder.java
+/home/silaaslan/proje/distributed-disk-register/distributed-disk-register/distributed-disk-register/src/main/java/com/example/family/HaToKuSeClient.java
 /home/silaaslan/proje/distributed-disk-register/distributed-disk-register/distributed-disk-register/target/generated-sources/protobuf/java/family/MessageId.java
 /home/silaaslan/proje/distributed-disk-register/distributed-disk-register/distributed-disk-register/target/generated-sources/protobuf/grpc-java/family/FamilyServiceGrpc.java
 /home/silaaslan/proje/distributed-disk-register/distributed-disk-register/distributed-disk-register/src/main/java/com/example/family/FamilyServiceImpl.java

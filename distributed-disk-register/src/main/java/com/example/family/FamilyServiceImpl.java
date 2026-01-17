@@ -6,6 +6,7 @@ import family.FamilyView;
 import family.NodeInfo;
 import family.ChatMessage;
 import io.grpc.stub.StreamObserver;
+import org.checkerframework.checker.nullness.qual.NonNull;
 
 public class FamilyServiceImpl extends FamilyServiceGrpc.FamilyServiceImplBase {
 
@@ -19,7 +20,7 @@ public class FamilyServiceImpl extends FamilyServiceGrpc.FamilyServiceImplBase {
     }
 
     @Override
-    public void join(NodeInfo request, StreamObserver<FamilyView> responseObserver) {
+    public void join(NodeInfo request, @NonNull StreamObserver<FamilyView> responseObserver) {
         registry.add(request);
 
         FamilyView view = FamilyView.newBuilder()

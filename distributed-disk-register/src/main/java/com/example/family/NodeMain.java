@@ -147,7 +147,7 @@ public class NodeMain {
                         messageLocationMap.put(sc.id(), savedNodes);
 
                         // 4. Doğrulama Logu
-                        if (distributedCount > 0) {
+                        if (distributedCount >= TOLERANCE) {
                             writer.println("OK");
                             System.out.println("✅ ID=" + sc.id() + " kopyalandı. Lider + " + distributedCount + " yedek.");
                         } else {
